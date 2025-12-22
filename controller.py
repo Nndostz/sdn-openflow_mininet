@@ -17,7 +17,15 @@ class FinalSDNController(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        # Default rule: NORMAL forwarding
+        # 1️⃣ DROP ICMP dari h1 (priority tinggi)
+        match = parser.OFPMatch(
+            eth_type=0x0800,
+            ip_proto=1,
+            ipv4_src='10.0.0.1'
+        )
+        self.add_flow(datapath, 100, match, [])
+
+        # 2️⃣ Default forwarding
         match = parser.OFPMatch()
         actions = [parser.OFPActionOutput(ofproto.OFPP_NORMAL)]
         self.add_flow(datapath, 0, match, actions)
@@ -51,11 +59,7 @@ class FinalSDNController(app_manager.RyuApp):
         if not ip:
             return
 
-        # 1️⃣ DROP ICMP dari h1
-        if ip.src == '10.0.0.1' and pkt.get_protocol(icmp.icmp):
-            return
-
-        # 2️⃣ FORWARD TCP h2 -> h3 via jalur s1 → s2 → s3
+        # 3️⃣ FORWARD TCP h2 -> h3
         if ip.src == '10.0.0.2' and ip.dst == '10.0.0.3' and pkt.get_protocol(tcp.tcp):
             actions = [parser.OFPActionOutput(2)]
             out = parser.OFPPacketOut(
@@ -68,7 +72,7 @@ class FinalSDNController(app_manager.RyuApp):
             datapath.send_msg(out)
             return
 
-        # 3️⃣ MODIFY HEADER paket dari h4
+        # 4️⃣ MODIFY HEADER paket dari h4
         if ip.src == '10.0.0.4':
             actions = [
                 parser.OFPActionSetField(eth_src='00:11:22:33:44:99'),
